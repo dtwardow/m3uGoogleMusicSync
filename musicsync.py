@@ -66,6 +66,9 @@ class MusicSync(object):
         print "Fetching playlists from Google..."
         self.playlists = self.wc.get_all_playlist_ids(auto=False)
         print "Got %d playlists." % len(self.playlists['user'])
+        print "Fetching all songs from Google..."
+        self.songs = self.wc.get_all_songs(incremental=False)
+        print "Got %d songs." % len(self.songs)
         print ""
 
 
@@ -130,41 +133,41 @@ class MusicSync(object):
             if online:
                 song_id = online['id']
                 print "   already uploaded [%s]" % song_id
-            else:
-                attempts = 0
-                result = []
-                while not result and attempts < MAX_UPLOAD_ATTEMPTS_PER_FILE:
-                    print "   uploading... (may take a while)"
-                    attempts += 1
-                    try:
-                        result = self.mm.upload(fn)
-                    except (BadStatusLine, CannotSendRequest):
-                        # Bail out if we're getting too many disconnects
-                        if fatal_count >= MAX_CONNECTION_ERRORS_BEFORE_QUIT:
-                            print ""
-                            print "Too many disconnections - quitting. Please try running the script again."
-                            print ""
-                            exit()
-
-                        print "Connection Error -- Reattempting login"
-                        fatal_count += 1
-                        self.wc.logout()
-                        self.mm.logout()
-                        result = []
-                        time.sleep(STANDARD_SLEEP)
-
-                    except:
-                        result = []
-                        time.sleep(STANDARD_SLEEP)
-
-                try:
-                    if result[0]:
-                        song_id = result[0].itervalues().next()
-                    else:
-                        song_id = result[1].itervalues().next()
-                    print "   upload complete [%s]" % song_id
-                except:
-                    print "      upload failed - skipping"
+#            else:
+#                attempts = 0
+#                result = []
+#                while not result and attempts < MAX_UPLOAD_ATTEMPTS_PER_FILE:
+#                    print "   uploading... (may take a while)"
+#                    attempts += 1
+#                    try:
+#                        result = self.mm.upload(fn)
+#                    except (BadStatusLine, CannotSendRequest):
+#                        # Bail out if we're getting too many disconnects
+#                        if fatal_count >= MAX_CONNECTION_ERRORS_BEFORE_QUIT:
+#                            print ""
+#                            print "Too many disconnections - quitting. Please try running the script again."
+#                            print ""
+#                            exit()
+#
+#                        print "Connection Error -- Reattempting login"
+#                        fatal_count += 1
+#                        self.wc.logout()
+#                        self.mm.logout()
+#                        result = []
+#                        time.sleep(STANDARD_SLEEP)#
+#
+#                    except:
+#                        result = []
+#                        time.sleep(STANDARD_SLEEP)##
+#
+#                try:
+#                    if result[0]:
+#                        song_id = result[0].itervalues().next()
+#                    else:
+#                        song_id = result[1].itervalues().next()
+#                    print "   upload complete [%s]" % song_id
+#                except:
+#                    print "      upload failed - skipping"
 
             if not song_id:
                 failed_files += 1
@@ -224,7 +227,7 @@ class MusicSync(object):
             print 'Found song with no ID3 title, setting using filename:'
             print '  %s' % title
             print '  (please note - the id3 format used (v2.4) is invisible to windows)'
-            data['title'] = [title]
+            data['title'] = title
             data.save()
         r['title'] = data['title'][0]
         r['track'] = int(data['tracknumber'][0].split('/')[0]) if 'tracknumber' in data else 0
@@ -241,11 +244,12 @@ class MusicSync(object):
 
     def find_song(self, filename):
         tag = self.get_id3_tag(filename)
-        results = self.wc.search(tag['title'])
+        #results = self.wc.search(tag['title'])
+        results = [ i for i in self.songs if i['title'] == tag['title'] ]
         # NOTE - dianostic print here to check results if you're creating duplicates
         #print results['song_hits']
-        #print "%s ][ %s ][ %s ][ %s" % (tag['title'], tag['artist'], tag['album'], tag['track'])
-        for r in results['song_hits']:
+        print "%s ][ %s ][ %s ][ %s" % (tag['title'], tag['artist'], tag['album'], tag['track'])
+        for r in results:
             if self.tag_compare(r, tag):
                 # TODO: add rough time check to make sure its "close"
                 return r
